@@ -1,0 +1,137 @@
+#!/usr/bin/env perl
+package App::CanIUse;
+use v5.10;
+use utf8;
+use strict;
+use warnings;
+my $basepath =  $ENV{CANIUSE_FEATURES_JSON_PATH} || "$ENV{HOME}/.caniuse/"; #json
+my $desired_api_name = my $command = $ARGV[0];
+use Mojo::JSON qw(decode_json encode_json);
+use Mojo::Util qw|slurp|;
+#use Perl6::Form;
+use Text::ANSITable;
+use Term::ANSIColor;
+use Text::Fuzzy;
+our $VERSION = 0.01;
+
+binmode(STDOUT, ":utf8");
+
+my $api_name = search_api_name( $desired_api_name ) if $desired_api_name;
+if ( $command =~ m#^--update#g ) { update_caniuse_metadata(); exit }
+if ( ! $api_name ) { show_help(); }
+show_results( $api_name );
+
+sub update_caniuse_metadata {
+    my $output = `cd $basepath && git pull`;
+    print $output;
+    exit 0;
+}
+
+sub search_api_name {
+    my $desired_api_name    = shift;
+    my @file_names  = map { $_ =~ s#.*/([^/]+).json#$1#; $_; } glob ($basepath . "/features-json/*");
+    my $tf          = Text::Fuzzy->new( $desired_api_name , max => 3 );
+    my $nearest     = $tf->nearest (\@file_names);
+    if ( $nearest && $nearest > 0 && $file_names[$nearest] ){
+        my $api_name = $file_names[$nearest];
+        return $api_name;
+    }
+    return 0;
+}
+
+sub show_results {
+    my $api_name = shift;
+    my $command_path = $basepath . "/features-json/" . $api_name . ".json";
+    if ( ! -e $command_path ) { print "Commant $api_name not found."; return }
+    my $json     = decode_json slurp $command_path;
+    my $fulldata = decode_json slurp $basepath . "/fulldata-json/data-2.0.json";
+
+    my $count = 0;
+    my $results = {
+        map {
+            $count++;
+            my $browser = $_; 
+            my $current_version = $fulldata->{agents}->{$browser}->{current_version};
+            $browser    => [
+                map { 
+                    $_.$json->{stats}->{$browser}->{$_}.( ($_ =~ m#^${current_version}$#) ? "*":"" );
+                } 
+                sort {
+                    my ( $_a, $_b ) = ( $a, $b ); 
+                    $_a  =~ s#([^-]+)-(.+)#$1#g; #get number part if contains -
+                    $_b  =~ s#([^-]+)-(.+)#$1#g; #get number part if contains -
+
+                    $_a  =~ s#(\d+)\.(\d+)\.(.+)#$1\.$2#g; #get number part if contains multiple dots 4.4.4
+                    $_b  =~ s#(\d+)\.(\d+)\.(.+)#$1\.$2#g; #get number part if contains multiple dots 4.4.4
+                    $_a <=> $_b;
+                } 
+                keys %{$json->{stats}->{$browser}}
+            ] 
+        } keys %{$json->{stats}}
+    };
+
+    my $t = Text::ANSITable->new;
+    $t->use_box_chars(1);
+    $t->use_color(1);
+
+    my $columns  = [qw|ie firefox chrome safari opera ios_saf op_mini android and_chr|]; 
+    $t->columns( $columns );
+    my $browser_with_more_rls = [sort { scalar @{ $results->{ $b } } <=> scalar @{ $results->{ $a } } } keys %$results ]->[0];
+    my $num_rows              = scalar @{ $results->{ $browser_with_more_rls } } ;
+
+    my $longest_distance_to_current_browser = distance_to_current_browser( $browser_with_more_rls, $results );
+
+    #align browser to current browser release    
+    map {
+        my $browser = $_;
+        if ( $browser ne $browser_with_more_rls ) {
+            my $distance = $longest_distance_to_current_browser - distance_to_current_browser( $browser, $results );
+            map { 
+                unshift @{ $results->{ $browser } }, "";
+            } 1..$distance;
+        }
+    } keys %{ $json->{ stats } };
+
+    map {
+        my $row_num = $_;
+        $t->add_row( [ map { 
+            ( $results->{ $_ }[$row_num] ) 
+                ? sub { 
+                        ( $results->{ $_ }[$row_num] =~ m#y#g)
+                            ?  colored( $results->{ $_ }[$row_num], "green")
+                            :  colored( $results->{ $_ }[$row_num], "red")
+                    }->()
+                : ""
+        } @$columns ] );
+        $t->set_row_style( $longest_distance_to_current_browser, { bgcolor => '444444' } );
+    } 0..$num_rows;
+    say $t->draw;
+    
+
+}
+
+sub show_help {
+    print <<HELP;
+caniuse version: $VERSION
+
+Usage: caniuse <api_name>
+ex:    caniuse fileapi
+       caniuse websocket
+
+Update caniuse
+       caniuse --update
+
+HELP
+    exit 0;
+}
+
+sub distance_to_current_browser {
+    my $browser = shift;
+    my $results = shift;
+    #calculate distance of current browser (marked as asterisk) in the browser that has most releases
+    my $offset                  = 0;
+    my $has_found_curr_version  = 0;
+    map { if ( !$has_found_curr_version && $_ !~ m#\*$#  ) { $offset++ } else { $has_found_curr_version = 1 } } @{ $results->{ $browser } };
+    $offset;
+}
+

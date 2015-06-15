@@ -40,3 +40,25 @@ Clone CanIUse repo and install
  $ git clone https://github.com/hernan604/App-CanIUse.git
  $ cd App-CanIUse
  $ perl Makefile.PL && make && make install
+
+=head2 VIM integration
+
+After the App::CanIUse is installed you can add this entry in .vimrc:
+
+ command! -nargs=+ Caniuse !caniuse <args>
+
+and in vim, you can call:
+
+ :Caniuse websocket
+
+Or, if you prefer, you can use this other alternative and bind to F4.
+
+ :map <F4> "zyiw:exe "! caniuse ".@z.""<CR>
+
+position your cursor under a word inside a buffer ie: "websocket" then press F4.
+
+
+=head3 AUTHOR
+
+Hernan Lopes
+

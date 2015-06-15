@@ -1,0 +1,42 @@
+=head1 App::CanIUse
+
+access caniuse.com information on the command line
+
+=head2 SYNOPSIS
+
+ $ caniuse websocket
+
+=begin HTML
+
+ <p><img src="./ss/websocket.gif" width="613" height="518" alt="Caniuse websocket screenshot" /></p>
+
+=end HTML
+
+ $ caniuse indexdb
+
+=begin HTML
+
+ <p><img src="./ss/indexdb.gif" width="631" height="518" alt="Caniuse indexdb screenshot" /></p>
+
+=end HTML
+
+It is also possible to update caniuse meta information with the following command:
+
+ $ caniuse --update
+ Already up-to-date.
+
+=head2 DESCRIPTION
+
+With App::CanIUse it is possible to query caniuse from the command line.
+
+=head2 INSTALLATION
+
+Clone caniuse rawdata into $HOME/.caniuse
+
+ $ git clone https://github.com/Fyrd/caniuse.git $HOME/.caniuse
+
+Clone CanIUse repo and install
+
+ $ git clone https://github.com/hernan604/App-CanIUse.git
+ $ cd App-CanIUse
+ $ perl Makefile.PL && make && make install

@@ -5,7 +5,7 @@ use ExtUtils::MakeMaker;
 my $deps = {
     'Mojolicious'         => 0,
     'Text::ANSITable'     => 0,
-    'Text::ANSIColor'     => 0,
+    'Term::ANSIColor'     => 0,
     'Text::Fuzzy'         => 0,
 };
 
